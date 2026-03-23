@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAHM OMEGA | مكة المكرمة</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&family=JetBrains+Mono:wght@400;700;800&family=Tajawal:wght@700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* ==========================================
+           1. المتغيرات والألوان (Deep Space & Gold)
+           ========================================== */
+        :root {
+            --bg-color: #020203; --panel-bg: rgba(8, 10, 15, 0.75); --text-main: #e2e8f0;
+            --accent-gold: #d4af37; --accent-cyan: #00e5ff; --profit: #00ff88; --loss: #ff2a2a;
+            --border-color: rgba(212, 175, 55, 0.15); --glass-glow: 0 0 20px rgba(0, 229, 255, 0.05);
+        }
+        
+        * { box-sizing: border-box; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: var(--bg-color); font-family: 'Cairo', sans-serif; color: var(--text-main); overflow: hidden; }
+
+        /* ==========================================
+           2. شاشة الإقلاع (Boot Sequence)
+           ========================================== */
+        #boot-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 9999; display: flex; flex-direction: column; justify-content: center; padding: 50px; font-family: 'JetBrains Mono', monospace; color: var(--accent-cyan); transition: opacity 1s ease-out; }
+        .boot-line { margin: 5px 0; font-size: 1.1rem; text-shadow: 0 0 5px var(--accent-cyan); opacity: 0; animation: fadeIn 0.1s forwards; }
+        @keyframes fadeIn { to { opacity: 1; } }
+
+        /* ==========================================
+           3. الخلفية ثلاثية الأبعاد
+           ========================================== */
+        #webgl-bg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; opacity: 0.6; }
+
+        /* ==========================================
+           4. الهيكل الأساسي (CSS Grid Layout)
+           ========================================== */
+        #main-ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; display: grid; grid-template-columns: 350px 1fr 350px; grid-template-rows: 70px 1fr 280px; gap: 15px; padding: 15px; pointer-events: none; opacity: 0; transition: opacity 2s 3.5s; }
+
+        .glass-panel { background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 8px; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); padding: 20px; pointer-events: auto; display: flex; flex-direction: column; box-shadow: var(--glass-glow), inset 0 0 10px rgba(255,255,255,0.02); overflow: hidden; position: relative; }
+        
+        /* ترويسة اللوحات */
+        .panel-title { font-size: 1.1rem; font-weight: 900; color: var(--accent-gold); border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; letter-spacing: 1px; }
+
+        /* ==========================================
+           5. الشريط العلوي وتوقيت مكة
+           ========================================== */
+        .top-navbar { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.85); border: 1px solid var(--border-color); border-radius: 8px; padding: 0 30px; pointer-events: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
+        .logo-text { font-family: 'Tajawal', sans-serif; font-size: 1.8rem; font-weight: 900; background: linear-gradient(90deg, var(--accent-gold), #fff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        
+        /* توقيت مكة المكرمة */
+        .mecca-time-container { display: flex; align-items: center; gap: 15px; background: rgba(212, 175, 55, 0.1); padding: 8px 20px; border-radius: 50px; border: 1px solid rgba(212, 175, 55, 0.3); }
+        .mecca-icon { font-size: 1.5rem; }
+        .mecca-label { font-size: 0.9rem; color: #aaa; margin-left: 10px; }
+        .mecca-clock { font-family: 'JetBrains Mono', monospace; font-size: 1.4rem; font-weight: 800; color: var(--accent-gold); text-shadow: 0 0 10px rgba(212, 175, 55, 0.5); }
+
+        /* ==========================================
+           6. الشارت المتقدم (Interactive Canvas)
+           ========================================== */
+        .chart-wrapper { grid-column: 2 / 3; grid-row: 2 / 3; display: flex; flex-direction: column; }
+        #trading-canvas { width: 100%; height: 100%; background: #040406; border-radius: 6px; border: 1px solid #222; cursor: crosshair; }
+        .chart-header { position: absolute; top: 20px; left: 20px; z-index: 2; pointer-events: none; }
+        .chart-sym { font-size: 2rem; font-weight: 900; color: rgba(255,255,255,0.8); }
+        .chart-price { font-family: 'JetBrains Mono'; font-size: 1.5rem; color: var(--profit); }
+
+        /* ==========================================
+           7. دفتر الأوامر والسيولة
+           ========================================== */
+        .order-book-table { width: 100%; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; border-collapse: collapse; }
+        .order-book-table th { color: #666; font-weight: normal; text-align: left; padding-bottom: 8px; border-bottom: 1px solid #333; }
+        .order-book-table td { padding: 5px 0; }
+        .ask-price { color: var(--loss); }
+        .bid-price { color: var(--profit); }
+        .vol-bar-bg { width: 60px; height: 4px; background: #222; border-radius: 2px; float: right; margin-top: 6px; overflow: hidden; }
+        .vol-bar-fill { height: 100%; background: var(--accent-cyan); }
+        
+        .spread-row { text-align: center; font-weight: bold; color: var(--accent-gold); padding: 10px 0; border-top: 1px dashed #333; border-bottom: 1px dashed #333; margin: 10px 0; }
+
+        /* ==========================================
+           8. الأخبار الذكية (Typewriter Effect)
+           ========================================== */
+        .news-terminal { flex-grow: 1; background: rgba(0,0,0,0.4); border-radius: 4px; padding: 15px; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; overflow: hidden; position: relative; }
+        .typing-cursor::after { content: '█'; animation: blink 1s step-start infinite; color: var(--accent-cyan); }
+        @keyframes blink { 50% { opacity: 0; } }
+        .news-history { color: #666; margin-bottom: 10px; font-size: 0.8rem; }
+
+        /* ==========================================
+           9. زر سهم الفخم (Action Button)
+           ========================================== */
+        .action-area { grid-column: 2 / 3; grid-row: 3 / 4; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .sahm-btn {
+            background: linear-gradient(45deg, #0a0a0a, #1a1a1a); border: 1px solid var(--accent-gold);
+            color: var(--accent-gold); font-size: 1.5rem; font-weight: 900; text-decoration: none;
+            padding: 15px 60px; border-radius: 4px; transition: 0.3s;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8), inset 0 0 15px rgba(212, 175, 55, 0.1);
+            display: flex; align-items: center; gap: 15px; text-transform: uppercase;
+        }
+        .sahm-btn:hover { background: var(--accent-gold); color: #000; box-shadow: 0 0 40px rgba(212, 175, 55, 0.4); transform: scale(1.02); }
+
+        /* الحقوق */
+        .copyright { position: absolute; bottom: 15px; right: 20px; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: #555; pointer-events: none; }
+        .copyright span { color: var(--accent-cyan); font-weight: bold; }
+
+    </style>
+</head>
+<body>
+
+    <div id="boot-screen">
+        <div id="boot-text"></div>
+    </div>
+
+    <div id="webgl-bg"></div>
+
+    <div id="main-ui">
+        
+        <div class="top-navbar">
+            <div class="logo-text">SAHM OMEGA V3</div>
+            
+            <div class="mecca-time-container">
+                <span class="mecca-icon">🕋</span>
+                <span class="mecca-label">توقيت مكة المكرمة:</span>
+                <span class="mecca-clock" id="mecca-time">00:00:00</span>
+            </div>
+            
+            <div style="font-family:'JetBrains Mono'; color:var(--profit); font-size:0.9rem;">
+                ● SYSTEM SECURE | PING: 12ms
+            </div>
+        </div>
+
+        <div class="glass-panel">
+            <div class="panel-title"><span>دفتر الأوامر (Level 2)</span><span>📊</span></div>
+            <table class="order-book-table">
+                <thead><tr><th>السعر (USD)</th><th>الكمية</th><th>القوة</th></tr></thead>
+                <tbody id="asks-container"></tbody>
+            </table>
+            <div class="spread-row">Spread: <span id="spread-value">0.00</span></div>
+            <table class="order-book-table">
+                <tbody id="bids-container"></tbody>
+            </table>
+        </div>
+
+        <div class="glass-panel chart-wrapper" style="padding:0;">
+            <div class="chart-header">
+                <div class="chart-sym">BTC / USD</div>
+                <div class="chart-price" id="main-price">65,240.00</div>
+            </div>
+            <canvas id="trading-canvas"></canvas>
+        </div>
+
+        <div class="glass-panel">
+            <div class="panel-title"><span>رادار الأصول الحية</span><span>🌐</span></div>
+            <div id="watchlist" style="overflow-y:auto; padding-right:5px; display:flex; flex-direction:column; gap:10px;">
+                </div>
+        </div>
+
+        <div class="glass-panel" style="grid-column: 1 / 2; grid-row: 3 / 4;">
+            <div class="panel-title"><span>تحليل الأخبار (AI Core)</span><span>🧠</span></div>
+            <div class="news-terminal">
+                <div id="news-history-container"></div>
+                <div id="typewriter-text" class="typing-cursor" style="color:var(--accent-gold);"></div>
+            </div>
+        </div>
+
+        <div class="action-area">
+            <div style="color:#aaa; margin-bottom:15px; font-size:0.9rem;">اقتنص الفرص الآن عبر المنصة الأسرع</div>
+            <a href="https://www.alsahm.com" target="_blank" class="sahm-btn">
+                <span>تنفيذ في تطبيق سهم</span>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+            </a>
+        </div>
+
+        <div class="glass-panel" style="grid-column: 3 / 4; grid-row: 3 / 4; justify-content:center; align-items:center;">
+            <div style="position:relative; width:120px; height:120px; border-radius:50%; background:conic-gradient(var(--profit) 65%, var(--accent-gold) 0 85%, var(--loss) 0); display:flex; justify-content:center; align-items:center;">
+                <div style="width:100px; height:100px; background:var(--bg-color); border-radius:50%; display:flex; justify-content:center; align-items:center; flex-direction:column;">
+                    <span style="font-size:0.7rem; color:#888;">السيولة</span>
+                    <span style="font-family:'JetBrains Mono'; font-weight:bold;">85%</span>
+                </div>
+            </div>
+            <div style="margin-top:20px; font-size:0.85rem; color:#aaa; text-align:center;">توزيع المحفظة الاستثمارية<br>(تحديث آلي)</div>
+        </div>
+
+    </div>
+
+    <div class="copyright">
+        SYSTEM ENGINEERED BY <span>ABDULRAHMAN ABDULLAH ALMUTAIRI</span>
+    </div>
+
+    <script>
+        // ----------------------------------------------------
+        // 1. شاشة الإقلاع السيبرانية (Boot Sequence)
+        // ----------------------------------------------------
+        const bootLines = [
+            "INITIALIZING QUANTUM CORE V3...",
+            "ESTABLISHING SECURE CONNECTION TO MECCA TIME SERVER...",
+            "SYNCING GLOBAL MARKET DATA (TASI, NYSE, CRYPTO)...",
+            "LOADING NEURAL NETWORK ALGORITHMS...",
+            "BYPASSING LATENCY PROTOCOLS...",
+            "WELCOME, ABDULRAHMAN. SYSTEM ONLINE."
+        ];
+        
+        const bootContainer = document.getElementById('boot-text');
+        let bootDelay = 0;
+        
+        bootLines.forEach((line, index) => {
+            setTimeout(() => {
+                const p = document.createElement('div');
+                p.className = 'boot-line';
+                p.innerText = `> ${line}`;
+                bootContainer.appendChild(p);
+            }, bootDelay);
+            bootDelay += 400 + Math.random() * 300; // تأخير عشوائي للإيهام بالتحميل
+        });
+
+        setTimeout(() => {
+            document.getElementById('boot-screen').style.opacity = '0';
+            document.getElementById('main-ui').style.opacity = '1';
+            setTimeout(() => document.getElementById('boot-screen').remove(), 1000);
+        }, bootDelay + 500);
+
+        // ----------------------------------------------------
+        // 2. توقيت مكة المكرمة المباشر (Mecca Time Engine)
+        // ----------------------------------------------------
+        function updateMeccaTime() {
+            const timeEl = document.getElementById('mecca-time');
+            // استخدام توقيت الرياض (يطابق توقيت مكة المكرمة UTC+3)
+            const options = { timeZone: 'Asia/Riyadh', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
+            // تحويل الأرقام للصيغة العربية والـ AM/PM لـ ص/م
+            let timeString = new Intl.DateTimeFormat('ar-SA', options).format(new Date());
+            timeEl.innerText = timeString;
+            requestAnimationFrame(updateMeccaTime);
+        }
+        updateMeccaTime();
+
+        // ----------------------------------------------------
+        // 3. محرك دفتر الأوامر (Level 2 Order Book Simulation)
+        // ----------------------------------------------------
+        let basePriceBTC = 65240.00;
+        
+        function updateOrderBook() {
+            let asksHTML = ''; let bidsHTML = '';
+            
+            // توليد Asks (طلبات البيع - أحمر)
+            for(let i = 4; i >= 0; i--) {
+                const price = (basePriceBTC + (i * 10) + Math.random() * 5).toFixed(2);
+                const vol = (Math.random() * 2 + 0.1).toFixed(3);
+                const barWidth = (vol / 2.1) * 100;
+                asksHTML += `<tr><td class="ask-price">${price}</td><td>${vol}</td><td><div class="vol-bar-bg"><div class="vol-bar-fill" style="width:${barWidth}%; background:var(--loss);"></div></div></td></tr>`;
+            }
+            
+            // توليد Bids (طلبات الشراء - أخضر)
+            for(let i = 0; i < 5; i++) {
+                const price = (basePriceBTC - (i * 10) - Math.random() * 5).toFixed(2);
+                const vol = (Math.random() * 2 + 0.1).toFixed(3);
+                const barWidth = (vol / 2.1) * 100;
+                bidsHTML += `<tr><td class="bid-price">${price}</td><td>${vol}</td><td><div class="vol-bar-bg"><div class="vol-bar-fill" style="width:${barWidth}%; background:var(--profit);"></div></div></td></tr>`;
+            }
+
+            document.getElementById('asks-container').innerHTML = asksHTML;
+            document.getElementById('bids-container').innerHTML = bidsHTML;
+            document.getElementById('spread-value').innerText = (Math.random() * 2 + 0.5).toFixed(2);
+            document.getElementById('main-price').innerText = basePriceBTC.toLocaleString();
+        }
+        setInterval(updateOrderBook, 800);
+
+        // ----------------------------------------------------
+        // 4. محفظة الأصول الديناميكية (Dynamic Watchlist)
+        // ----------------------------------------------------
+        const watchlistData = [
+            { sym: 'TASI', name: 'السوق السعودي', price: 12560.40 },
+            { sym: 'GOLD', name: 'الذهب المادي', price: 2365.10 },
+            { sym: 'NVDA', name: 'NVIDIA', price: 899.20 },
+            { sym: 'ETH', name: 'Ethereum', price: 3450.00 },
+            { sym: 'ARAMCO', name: 'أرامكو', price: 30.20 }
+        ];
+
+        function renderWatchlist() {
+            const container = document.getElementById('watchlist');
+            container.innerHTML = '';
+            
+            watchlistData.forEach(asset => {
+                const change = (Math.random() - 0.5) * (asset.price * 0.002);
+                asset.price += change;
+                const isUp = change >= 0;
+                const color = isUp ? 'var(--profit)' : 'var(--loss)';
+                const sign = isUp ? '+' : '';
+                
+                container.innerHTML += `
+                    <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.4); padding:12px; border-radius:6px; border-right:2px solid ${color};">
+                        <div>
+                            <div style="font-weight:bold; font-size:0.95rem;">${asset.name}</div>
+                            <div style="font-size:0.7rem; color:#888; font-family:'JetBrains Mono';">${asset.sym}</div>
+                        </div>
+                        <div style="text-align:left;">
+                            <div style="font-family:'JetBrains Mono'; font-weight:bold; font-size:1.1rem; color:${color};">${asset.price.toLocaleString(undefined, {minimumFractionDigits:2})}</div>
+                            <div style="font-size:0.75rem; color:${color};">${sign}${change.toFixed(2)}</div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+        setInterval(renderWatchlist, 2000);
+        renderWatchlist();
+
+        // ----------------------------------------------------
+        // 5. محرك الشارت التفاعلي (Advanced Canvas Engine with Crosshair)
+        // ----------------------------------------------------
+        const canvas = document.getElementById('trading-canvas');
+        const ctx = canvas.getContext('2d');
+        const candles = [];
+        let mousePos = null;
+
+        function resizeChart() {
+            // حل مشكلة الدقة للشاشات العالية (Retina)
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+        }
+        window.addEventListener('resize', resizeChart);
+        setTimeout(resizeChart, 100);
+
+        // تتبع الماوس داخل الشارت
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            mousePos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+        });
+        canvas.addEventListener('mouseleave', () => mousePos = null);
+
+        function drawChart() {
+            if(canvas.width === 0) return;
+
+            // توليد الشموع
+            const open = basePriceBTC;
+            const close = open + (Math.random() - 0.5) * 100;
+            const high = Math.max(open, close) + Math.random() * 50;
+            const low = Math.min(open, close) - Math.random() * 50;
+            basePriceBTC = close;
+            
+            candles.push({o: open, c: close, h: high, l: low});
+            const candleWidth = 12;
+            const spacing = 4;
+            const maxVisible = Math.floor(canvas.width / (candleWidth + spacing));
+            if(candles.length > maxVisible) candles.shift();
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // رسم الشبكة الخلفية (Grid)
+            ctx.strokeStyle = '#111';
+            ctx.lineWidth = 1;
+            for(let i=0; i<10; i++) {
+                ctx.beginPath();
+                ctx.moveTo(0, (canvas.height/10) * i);
+                ctx.lineTo(canvas.width, (canvas.height/10) * i);
+                ctx.stroke();
+            }
+
+            const minLow = Math.min(...candles.map(c => c.l));
+            const maxHigh = Math.max(...candles.map(c => c.h));
+            const range = maxHigh - minLow || 1;
+
+            // رسم الشموع
+            candles.forEach((candle, i) => {
+                const x = i * (candleWidth + spacing) + 10;
+                
+                const getY = (val) => canvas.height - ((val - minLow) / range) * (canvas.height * 0.8) - (canvas.height * 0.1);
+                
+                const yO = getY(candle.o);
+                const yC = getY(candle.c);
+                const yH = getY(candle.h);
+                const yL = getY(candle.l);
+                
+                const color = candle.c >= candle.o ? '#00ff88' : '#ff2a2a';
+                ctx.strokeStyle = color;
+                ctx.fillStyle = color;
+                
+                // الظل
+                ctx.beginPath();
+                ctx.moveTo(x + candleWidth/2, yH);
+                ctx.lineTo(x + candleWidth/2, yL);
+                ctx.stroke();
+                
+                // الجسم
+                const bodyY = Math.min(yO, yC);
+                const bodyH = Math.max(Math.abs(yO - yC), 2);
+                ctx.fillRect(x, bodyY, candleWidth, bodyH);
+            });
+
+            // رسم التقاطع التفاعلي (Crosshair) إذا الماوس موجود
+            if (mousePos) {
+                ctx.strokeStyle = 'rgba(212, 175, 55, 0.5)'; // خط ذهبي شفاف
+                ctx.lineWidth = 1;
+                ctx.setLineDash([5, 5]); // خط متقطع
+                
+                // خط عمودي
+                ctx.beginPath();
+                ctx.moveTo(mousePos.x, 0);
+                ctx.lineTo(mousePos.x, canvas.height);
+                ctx.stroke();
+                
+                // خط أفقي
+                ctx.beginPath();
+                ctx.moveTo(0, mousePos.y);
+                ctx.lineTo(canvas.width, mousePos.y);
+                ctx.stroke();
+                
+                ctx.setLineDash([]); // إعادة الخط لمتصل
+                
+                // رسم مستطيل السعر على اليمين
+                const priceAtY = maxHigh - ((mousePos.y - canvas.height*0.1) / (canvas.height*0.8)) * range;
+                ctx.fillStyle = '#d4af37';
+                ctx.fillRect(canvas.width - 80, mousePos.y - 12, 80, 24);
+                ctx.fillStyle = '#000';
+                ctx.font = 'bold 12px JetBrains Mono';
+                ctx.fillText(priceAtY.toFixed(2), canvas.width - 75, mousePos.y + 4);
+            }
+        }
+        setInterval(drawChart, 1000);
+
+        // ----------------------------------------------------
+        // 6. الأخبار بأسلوب الآلة الكاتبة (Typewriter AI News)
+        // ----------------------------------------------------
+        const aiNewsDatabase = [
+            "خوارزمياتنا ترصد تجميع مؤسسي على قطاع التكنولوجيا.",
+            "تحذير: تقلبات عالية متوقعة خلال ساعة بسبب بيانات التضخم.",
+            "مؤشر الـ MACD يعطي إشارة شراء قوية لأسهم البنوك في تاسي.",
+            "سيولة تتجه نحو الذهب كملاذ آمن بسبب توترات جيوسياسية جديدة."
+        ];
+        
+        const typeTarget = document.getElementById('typewriter-text');
+        const historyTarget = document.getElementById('news-history-container');
+        let currentNewsIdx = 0;
+        let charIdx = 0;
+        let isTyping = false;
+
+        function typeWriter() {
+            if(!isTyping) {
+                isTyping = true;
+                typeTarget.innerText = '';
+                charIdx = 0;
+            }
+
+            const currentText = aiNewsDatabase[currentNewsIdx];
+            if (charIdx < currentText.length) {
+                typeTarget.innerText += currentText.charAt(charIdx);
+                charIdx++;
+                setTimeout(typeWriter, 50); // سرعة الكتابة
+            } else {
+                // الانتهاء من الخبر
+                setTimeout(() => {
+                    // نقل الخبر للسجل
+                    const timeStr = new Date().toLocaleTimeString('en-US', {hour12:false});
+                    const historyItem = document.createElement('div');
+                    historyItem.className = 'news-history';
+                    historyItem.innerText = `[${timeStr}] ${currentText}`;
+                    historyTarget.prepend(historyItem);
+                    
+                    if(historyTarget.children.length > 3) historyTarget.lastChild.remove();
+                    
+                    isTyping = false;
+                    currentNewsIdx = (currentNewsIdx + 1) % aiNewsDatabase.length;
+                    setTimeout(typeWriter, 2000); // راحة قبل الخبر التالي
+                }, 3000); // فترة بقاء الخبر قبل مسحه
+            }
+        }
+        setTimeout(typeWriter, 4000); // بدء بعد الإقلاع
+
+        // ----------------------------------------------------
+        // 7. محرك 3D WebGL (Global Financial Network Sphere)
+        // ----------------------------------------------------
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = 25;
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.getElementById('webgl-bg').appendChild(renderer.domElement);
+
+        // إنشاء كرة أرضية سلكية (Wireframe Globe)
+        const globeGeo = new THREE.SphereGeometry(10, 32, 32);
+        const globeMat = new THREE.MeshBasicMaterial({ 
+            color: 0x00e5ff, wireframe: true, transparent: true, opacity: 0.15 
+        });
+        const globe = new THREE.Mesh(globeGeo, globeMat);
+        scene.add(globe);
+
+        // إنشاء جزيئات (Nodes) تدور حول الكرة
+        const pGeo = new THREE.BufferGeometry();
+        const pCount = 500;
+        const pPos = new Float32Array(pCount * 3);
+        for(let i=0; i<pCount*3; i+=3) {
+            // توزيع كروي
+            const r = 10.5;
+            const theta = 2 * Math.PI * Math.random();
+            const phi = Math.acos(2 * Math.random() - 1);
+            pPos[i] = r * Math.sin(phi) * Math.cos(theta);
+            pPos[i+1] = r * Math.sin(phi) * Math.sin(theta);
+            pPos[i+2] = r * Math.cos(phi);
+        }
+        pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+        const pMat = new THREE.PointsMaterial({ color: 0xd4af37, size: 0.1, transparent: true, opacity: 0.8 });
+        const nodes = new THREE.Points(pGeo, pMat);
+        scene.add(nodes);
+
+        // حلقة التحريك 3D
+        function animate3D() {
+            requestAnimationFrame(animate3D);
+            // دوران الأرض
+            globe.rotation.y += 0.002;
+            globe.rotation.x += 0.001;
+            // دوران العقد (الأسواق)
+            nodes.rotation.y -= 0.001;
+            nodes.rotation.z += 0.0005;
+
+            renderer.render(scene, camera);
+        }
+        animate3D();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+    </script>
+</body>
+</html>
